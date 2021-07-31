@@ -2,16 +2,16 @@ import pandas as pd
 import os
 import cv2
 import timeit
-# 把 视频， output.csv 和 lane.csv 以及 stop_detection_area.csv 放在 video(i)/路径内即可
-
+# put video, output.csv, lane.csv and stop_detection_area.csv under path video(i)/
 
 def distance(p1, p2):
+    # Calculate the distance between two points
     return ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)**0.5
 
 
 def video_to_frames():
     # convert the input video to images, store in video1//frames
-    cap = cv2.VideoCapture('video1/change_lane_1.mp4')
+    cap = cv2.VideoCapture('video1/video.mp4')
 
     final_directory = os.path.join(os.getcwd(), r'video1/frames')
     if not os.path.exists(final_directory):
@@ -30,7 +30,7 @@ def video_to_frames():
 
 
 def read_lane_equation():
-    # read lane equation from video1/lane.csv (get from makesense.ai)
+    # read lane equations from video1/lane.csv (get from makesense.ai)
     file_in = open('video1/lane.csv', 'r')
     lines = file_in.readlines()
 
@@ -49,7 +49,7 @@ def read_lane_equation():
 
 def read_stop_detection_area():
     # read stop detection area from video1/stop_detection_area.csv (get from makesense.ai)
-    # return x1, y1 of upper left point, x2, y2 of bottom right point
+    # return a list of bounding boxes of stop area, each represented by x1, y1 of upper left point, x2, y2 of bottom right point
 
     try:
         file_in = open('video1/stop_detection_area.csv', 'r')
@@ -57,14 +57,14 @@ def read_stop_detection_area():
         file_in.close()
     except FileNotFoundError:
         return []
-    boxes = []
+    bounding_boxes = []
     for line in lines:
         line = line.split(',')
         x1, y1, w, h = int(line[1]), int(line[2]), int(line[3]), int(line[4])
 
-        boxes.append((x1, y1, x1+w, y1+h))
+        bounding_boxes.append((x1, y1, x1+w, y1+h))
 
-    return boxes
+    return bounding_boxes
 
 
 def read_vehicles():
@@ -106,6 +106,7 @@ def detect_stop(stop_areas, trace):
     # input: stop areas and one vehicle trace
     # output: -1 if the vehicle doesn't stop in any of the stop areas
     #        1 if the vehicle doesn't stop in any of the stop areas
+    # Identify criteria: Sum of moving distance < 50 pixel or stop 3 seconds
     
     if not trace or not stop_areas:
         return -1
@@ -117,7 +118,7 @@ def detect_stop(stop_areas, trace):
             count += 1
         sum_distance += distance(trace[i-1], trace[i])
 
-    if sum_distance < 50 or distance(trace[0], trace[-1]) < 10 or count > 100:
+    if sum_distance < 50 or count > 90:
         for stop_area in stop_areas:
             if stop_area[2] >= trace[0][0] >= stop_area[0] and stop_area[3] >= trace[0][1] >= stop_area[1]:
                 return 1
@@ -240,11 +241,9 @@ def merge_images_to_video(max_frame):
 
 
 def main():
-    # video_to_frames()
+    video_to_frames()
 
-    # return
-
-    start = timeit.default_timer()
+    
     lane_equations = read_lane_equation()
     stop_areas = read_stop_detection_area()
     vehicle_traces, vehicle_frames = read_vehicles()
@@ -253,13 +252,12 @@ def main():
 
     print("Vehicle IDs that stop in the stop detection area", stop_vehicles)
     print("Vehicle IDs and the frame ids they pass the lane", passing_lane_vehicles)
-    stop = timeit.default_timer()
 
-    print('Time: ', stop - start)
     return
-    # 可以不跑后面的，后面两个函数是用来输出标注的图像和视频的
+
+    # No need to run function mark and merge_images_to_video if video output is not requireed
     max_frame = mark(vehicle_traces, vehicle_frames, passing_lane_vehicles, stop_vehicles)
-    print('mark_finish')
+
     merge_images_to_video(max_frame)
 
 
